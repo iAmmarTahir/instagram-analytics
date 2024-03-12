@@ -1,0 +1,140 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+
+library(ggplot2)
+library(cowplot)
+library(corrplot)
+library(dplyr)
+library(caret)
+library(factoextra)
+library(cluster)
+df <- read.csv("Trisha/1combined_data.csv")
+
+```
+
+```{r}
+summary(df)
+```
+```{r}
+df$likes <- as.numeric(as.character(df$likes))
+df$comments <- as.numeric(as.character(df$comments))
+df$followers <- as.numeric(as.character(df$followers))
+
+df$likes[is.na(df$likes)] <- 0
+df$comments[is.na(df$comments)] <- 0
+df$followers[is.na(df$followers)] <- 0
+
+average_metrics <- df %>%
+  group_by(owner_username) %>%
+  summarise(
+    average_likes = mean(likes, na.rm = TRUE),
+    average_comments = mean(comments, na.rm = TRUE),
+    average_followers = mean(followers, na.rm = TRUE)
+  )
+
+print(average_metrics)
+```
+
+```{r}
+correlation_matrix <- cor(average_metrics[, c("average_likes", "average_comments", "average_followers")])
+print(correlation_matrix)
+corrplot(cor_matrix, method = "color")
+```
+
+```{r}
+ggplot(average_metrics, aes(x = average_likes, y = average_followers)) +
+  geom_point() + 
+  geom_smooth(method = "lm", level = 0.95) + 
+  labs(x = "Average Likes", y = "Average Followers", title = "Relationship between Average Likes and Average Followers") +
+  scale_x_continuous(limits = c(0, 15000))  +
+  scale_y_continuous(limits = c(0, 7e+06 )) + 
+  theme_minimal() 
+```
+
+
+
+```{r}
+model_likes <- lm(average_followers ~ average_likes, data = average_metrics)
+summary_likes <- summary(model_likes)
+print(summary_likes)
+```
+
+
+
+```{r}
+model_comments <- lm(average_followers ~ average_comments, data = average_metrics)
+summary_comments <- summary(model_comments)
+print(summary_comments)
+```
+
+
+
+```{r}
+model_combined <- lm(average_followers ~ average_likes + average_comments, data = average_metrics)
+summary(model_combined)
+```
+
+```{r}
+sse <- sum(residuals(model_comments)^2)
+
+tss <- sum((average_metrics$average_followers - mean(average_metrics$average_followers))^2)
+
+rss <- tss - sse
+
+k <- 1
+
+df_residuals <- nrow(average_metrics) - k - 1
+
+f_statistic <- (rss / k) / (sse / df_residuals)
+
+p_value <- pf(f_statistic, k, df_residuals, lower.tail = FALSE)
+
+cat("F-statistic:", f_statistic, "\n")
+cat("p-value for F-statistic:", p_value, "\n")
+```
+
+
+```{r}
+sse <- sum(residuals(model_likes)^2)
+
+tss <- sum((average_metrics$average_followers - mean(average_metrics$average_followers))^2)
+
+rss <- tss - sse
+
+k <- 1
+
+df_residuals <- nrow(average_metrics) - k - 1
+
+f_statistic <- (rss / k) / (sse / df_residuals)
+
+p_value <- pf(f_statistic, k, df_residuals, lower.tail = FALSE)
+
+cat("F-statistic:", f_statistic, "\n")
+cat("p-value for F-statistic:", p_value, "\n")
+```
+```{r}
+sse_combined <- sum(residuals(model_combined)^2)
+
+tss_combined <- sum((average_metrics$average_followers - mean(average_metrics$average_followers))^2)
+
+rss_combined <- tss_combined - sse_combined
+
+k_combined <- 2
+
+df_residuals_combined <- nrow(average_metrics) - k_combined - 1
+
+f_statistic_combined <- (rss_combined / k_combined) / (sse_combined / df_residuals_combined)
+
+p_value_combined <- pf(f_statistic_combined, k_combined, df_residuals_combined, lower.tail = FALSE)
+
+cat("F-statistic for combined model:", f_statistic_combined, "\n")
+cat("p-value for F-statistic for combined model:", p_value_combined, "\n")
+
+```
+
+
+
