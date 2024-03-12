@@ -1,0 +1,122 @@
+---
+title: 'Option 55: Question 3'
+author: "Apratim Tripathi"
+date: "2024-03-04"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+library(lubridate)
+library(dplyr)
+library(ggplot2)
+library(car)
+```
+
+```{r}
+instagram <- read.csv("data/combined_data.csv")
+instagram <- na.omit(instagram)
+instagram$created_at <- as.integer(instagram$created_at)
+instagram$likes <- as.integer(instagram$likes)
+instagram$comments <- as.integer(instagram$comments)
+
+```
+
+
+```{r}
+#Extracting hours from timestamp
+
+instagram$hour <- format(as.POSIXct(instagram$created_at, origin = "1970-01-01" , tz="US/Pacific"), "%H")
+instagram$hour <- as.integer(as.character(instagram$hour))
+
+
+
+#binning hours into segments of a day
+instagram$part_of_day <- cut(instagram$hour,
+                      breaks <- c(0, 4, 8, 12, 16, 20, 24),
+                      labels <- c("Late Night", "Early Morning", "Morning", "Afternoon", "Evening", "Night"),
+                      include.lowest = TRUE)
+instagram
+
+instagram$part_of_day <- factor(instagram$part_of_day)
+levels(instagram$part_of_day)[levels(instagram$part_of_day) == "Late Night"] <- "Late Night"
+
+```
+```{r}
+# Calculate engagement score
+instagram$engagement_score <- (instagram$likes + instagram$comments)/instagram$followers*100
+instagram_grouped <- instagram %>%
+  group_by(part_of_day) %>%
+  summarise(mean_engagement_score = mean(engagement_score))
+```
+
+```{r}
+#Plotting Mean Engagement Score by Part of Day
+ggplot(instagram_grouped, aes(x = part_of_day, y = mean_engagement_score, fill = part_of_day)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = 'Mean Engagement Score by Part of Day',
+       x = 'Part of Day',
+       y = 'Mean Engagement Score') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+# Calculate count of posts
+instagram_grouped <- instagram %>%
+  group_by(part_of_day) %>%
+  summarise(count_posts = n())
+```
+```{r}
+
+```
+
+```{r}
+#Count of Posts by Part of Day
+ggplot(instagram_grouped, aes(x = part_of_day, y = count_posts, fill = part_of_day)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = 'Count of Posts by Part of Day',
+       x = 'Part of Day',
+       y = 'Count of Posts') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+normality_test_results <- by(instagram$engagement_score, instagram$part_of_day, shapiro.test)
+normality_test_results
+levenes_test_result <- leveneTest(engagement_score ~ part_of_day, data = instagram)
+levenes_test_result
+
+if (all(unlist(lapply(normality_test_results, function(x) x$p.value)) > 0.05) &&
+    levenes_test_result$p.value > 0.05) {
+  anova_result <- aov(engagement_score ~ part_of_day, data = instagram)
+  summary(anova_result)
+} else {
+  kruskal_test_result <- kruskal.test(engagement_score ~ part_of_day, data = instagram)
+  print(kruskal_test_result)
+}
+
+```
+```{r}
+library(dunn.test)
+
+dunn_result <- dunn.test(instagram$engagement_score, instagram$part_of_day, method="bonferroni")
+
+dunn_result <- dunn.test(instagram$engagement_score, instagram$part_of_day, method="bonferroni")
+dunn_table <- data.frame(
+  Comparison = dunn_result$comparisons,
+  Z_Value = dunn_result$Z,
+  P_Value = dunn_result$P,
+  P_Adjusted = dunn_result$P.adjusted
+)
+dunn_table
+
+```
+
+
